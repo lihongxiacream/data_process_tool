@@ -1,0 +1,74 @@
+# Process config example for dataset
+
+# global parameters
+project_name: 'demo-process'
+dataset_path: './demos/data/moss003_qwen.jsonl' # path to your dataset directory or file
+np: 4  # number of subprocess to process your dataset
+text_keys: 'input'  # 若是多轮问答，则‘input’和‘output’分别对应user content和assistant content
+data_type: 'Sharegpt'
+export_path: './outputs/test/moss003-processed.jsonl'
+
+# process schedule
+# a list of several process operators with their arguments
+process:
+  - document_deduplicator: # 16957516
+      lowercase: true # whether to convert text to lower case
+      ignore_non_character: true
+
+  - alphanumeric_filter: # 16957388 筛掉无标点符号的句子
+      tokenization: false
+      min_ratio: 0.1
+      max_ratio: 0.95
+
+  - character_repetition_filter: # 16956845  筛掉重复字符
+      rep_len: 10
+      max_ratio: 0.5
+
+
+  - flagged_words_filter: # 16954629  筛掉含敏感词句子
+      lang: en
+      tokenization: true
+      use_words_aug: true
+      max_ratio: 0.01   #修改！！！！！
+      words_aug_group_sizes: [2]
+      words_aug_join_char: ""
+
+#  - language_id_score_filter: #筛掉非中文句子
+#      lang: en
+#      min_score: 0.5
+
+  - perplexity_filter: #筛掉困惑度高的句子 即语义混乱不清 无法让人理解
+      lang: en
+      max_ppl: 15000  # < 3sigma (6723) -- 676914
+
+  - text_length_filter: # 16954317 筛掉过短文本和过长文本
+      min_len: 5
+      max_len: 10000
+
+  - special_characters_filter: # 过滤特殊字符占比高的句子   对于math和code这类特殊任务不需要使用
+      min_ratio: 0.0                                          # the min ratio of filter range
+      max_ratio: 0.7                                    # the max ratio of filter range
+
+  - stopwords_filter: # 筛掉停顿词过少的 不能针对两种语言进行筛选 对于math和code这类特殊任务不需要使用
+      lang: en                                                # consider stopwords in what language
+      tokenization: true                                     # whether to use model to tokenize documents
+      min_ratio: 0.2                                          # the min ratio to filter text
+      stopwords_dir: ./assets                                 # directory to store stopwords dictionaries
+      use_words_aug: true                                    # whether to augment words, especially for Chinese and Vietnamese
+      words_aug_group_sizes: [2]                              # the group size of words to augment
+      words_aug_join_char: ""
+
+  - word_repetition_filter: # 筛掉重复文本片段  针对code和math任务可以提升max_ratio
+      lang: en
+      tokenization: true
+      rep_len: 10
+      min_ratio: 0.0
+      max_ratio: 0.5
+
+  - document_simhash_deduplicator: # 9873214  计算文档内两个句子的相似度，筛掉相似度高句子（哈希的汉明距离阈值）
+      tokenization: character
+      window_size: 6  # small window size for short texts
+      lowercase: true
+      ignore_pattern: '\p{P}'
+      num_blocks: 6
+      hamming_distance: 4  # larger hamming distance threshold for short texts
