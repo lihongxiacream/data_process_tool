@@ -7,7 +7,7 @@ from typing import Sequence, Dict
 from dataclasses import dataclass
 from deita.selection.embedder.conversation import get_conv_template
 from accelerate import Accelerator
-
+from torch.nn.utils.rnn import pad_sequence
 IGNORE_INDEX=-100
 
 
@@ -81,17 +81,31 @@ class DataCollatorForSupervisedDataset(object):
         # input_ids = torch.tensor(input_ids)
 
         #bug fix
-        new_ids=[]
-        chunk_size=len(input_ids[0])
-        for i in range(len(input_ids)):
-            if chunk_size<len(input_ids[i]):
-                new_ids.append(input_ids[i][:chunk_size])
+        def left_pad_sequence(sequences, batch_first=False, padding_value=0):
+            max_len = max([s.size(0) for s in sequences])
+            padded_sequences = []
+
+            for seq in sequences:
+                pad_size = max_len - seq.size(0)
+                if pad_size > 0:
+                    # 从左侧填充
+                    padding = torch.full((pad_size,), padding_value, dtype=seq.dtype)
+                    padded_seq = torch.cat([padding, seq], dim=0)
+                else:
+                    padded_seq = seq
+                padded_sequences.append(padded_seq)
+
+            if batch_first:
+                return torch.stack(padded_sequences)
             else:
-                new_ids.append(input_ids[i])
+                return torch.stack(padded_sequences).transpose(0, 1)
+
+        input_ids = [torch.tensor(ids) for ids in input_ids]
+        padded_ids = left_pad_sequence(input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
 
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
-            torch.tensor(new_ids), batch_first=True, padding_value=self.tokenizer.pad_token_id
+            torch.tensor(padded_ids), batch_first=True, padding_value=self.tokenizer.pad_token_id
         )
         instance_index = torch.tensor([instance["idx"] for instance in instances]).to(input_ids.device)
 
