@@ -139,8 +139,8 @@ class Superfiltering_IFD():
         filtered_data = [x for x in old_data if
                      (isinstance(x['ifd_ppl'], (int, float)) and x['ifd_ppl'] < self.filter_threash)]
         new_data = sorted(filtered_data, key=sort_key, reverse=True)
-        new_data = new_data[:sample_num]
-
+        if len(new_data) > sample_num:
+            new_data = new_data[:sample_num]
         return new_data
 
     #筛选单轮问答数据
@@ -159,7 +159,9 @@ class Superfiltering_IFD():
         new_data = sorted(filtered_data, key=sort_key, reverse=True)
 
         sample_num = int(len(json_data) * self.sample_rate)
-        new_data = new_data[:sample_num]
+
+        if len(new_data) > sample_num:
+            new_data = new_data[:sample_num]
 
         return new_data
 
@@ -167,8 +169,10 @@ class Superfiltering_IFD():
 
         model = AutoModelForCausalLM.from_pretrained(self.model_name_or_path, device_map="auto", cache_dir='../cache', output_hidden_states=True)
         tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, cache_dir='../cache')
-
         model.eval()
+        # model_en = AutoModelForCausalLM.from_pretrained("/luankexin/lihongxia/Superfiltering/gpt2", device_map="auto", cache_dir='../cache', output_hidden_states=True)
+        # tokenizer_en = AutoTokenizer.from_pretrained("/luankexin/lihongxia/Superfiltering/gpt2", cache_dir='../cache')
+        # model_en.eval()
 
         print("------------模型加载结束--------------")
         #判断一下输入是否是列表 不是列表的话按行读入
@@ -182,7 +186,7 @@ class Superfiltering_IFD():
                 for line in f:
                     read_data.append(json.loads(line.strip()))
 
-        read_data=read_data[:1000]
+
         #判断是否是多轮问答数据，是的话预处理成单轮问答
         if self.data_type=="Sharegpt":
             data=self.preprocess_multi(read_data)
@@ -199,10 +203,11 @@ class Superfiltering_IFD():
         os.makedirs("./outputs/.cache/", exist_ok=True)
         with open(save_path, "w") as file:
             pass  # Creates an empty file
-        #
+
+        #若跑到一半终止可以从此时继续跑
         # with open(save_path, "r") as file:
         #     exsisting_num =  sum(1 for _ in file)
-        # sampled_data = sampled_data[exsisting_num:]
+        # data = data[exsisting_num:]
 
         print("----------数据读取完成----------")
 
@@ -230,6 +235,14 @@ class Superfiltering_IFD():
                 whole_text = promt_to_use + output_i
                 instruct_i = promt_to_use
 
+            #判断当前instruct是中文还是英文，选择不同的模型
+            # lang = detect(instruct_i)
+            # if lang == 'zh-cn':
+            #     model=model_zh
+            #     tokenizer=tokenizer_zh
+            # else:
+            #     model=model_en
+            #     tokenizer=tokenizer_en
 
             instruct_i_input_ids = tokenizer.encode(instruct_i, return_tensors="pt", truncation=True, max_length=self.max_length).to(self.device)
             instruct_i_len = instruct_i_input_ids.shape[1]

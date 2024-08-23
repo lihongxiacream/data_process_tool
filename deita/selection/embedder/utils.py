@@ -30,15 +30,15 @@ def preprocess(
 
         if not only_answer:
             for i, source in enumerate(sources):
-                if roles[source[0]["from"]] != conv.roles[0]:
-                    # Skip the first one if it is not from human
-                    source = source[1:]
+                # if roles[source[0]["from"]] != conv.roles[0]:
+                #     # Skip the first one if it is not from human
+                #     source = source[1:]
 
                 conv.messages = []
                 for j, sentence in enumerate(source):
                     role = roles[sentence["from"]]
                     # assert role == conv.roles[j % 2], f"{i}"
-                    assert role == conv.roles[j % 2], breakpoint()
+                    #assert role == conv.roles[j % 2], breakpoint()
                     conv.append_message(role, sentence["value"])
                 conversations.append(conv.get_prompt())
         else:
