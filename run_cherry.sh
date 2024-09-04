@@ -1,8 +1,3 @@
-pip install -r requirements.txt
-
-cd lihongxia/Cherry_LLM
-source cherry_env/bin/activate
-
 #选择Pre-Experienced数据集
 #计算embedding
 CUDA_VISIBLE_DEVICES=0 python Cherry/data_analysis.py \
