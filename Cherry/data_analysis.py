@@ -254,7 +254,7 @@ def main():
 
         final=[]
         for i in final_data:
-            i['output']='<|im_start|>system\n'+i['output']
+            i['output']='<|im_start|>assistant\n'+i['output']
             final.append(i)
 
         with open(args.save_path, "w") as file:
