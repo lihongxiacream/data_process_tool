@@ -40,9 +40,7 @@ PROMPT_DICT = {
         "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
     ),
     "prompt_no_input": (
-        "Below is an instruction that describes a task. "
-        "Write a response that appropriately completes the request.\n\n"
-        "{instruction}\n<|im_start|>assistant\n"
+        "<|im_start|>user\n{instruction}<|im_end|>\n<|im_start|>assistant\n"
     )
 }
 
@@ -254,7 +252,7 @@ def main():
 
         final=[]
         for i in final_data:
-            i['output']='<|im_start|>assistant\n'+i['output']
+            #i['output']='<|im_start|>assistant\n'+i['output']
             final.append(i)
 
         with open(args.save_path, "w") as file:
