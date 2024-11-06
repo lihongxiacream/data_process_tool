@@ -10,12 +10,13 @@ from transformers import DataCollatorWithPadding
 import time
 from datasets import Dataset, DatasetDict
 #from vllm import LLM, SamplingParams
-#from accelerate import Accelerator
+from accelerate import Accelerator
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # 禁用并行处理
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
-    parser.add_argument("--save_loss_path", type=str, default='loss.json')
+    parser.add_argument("--save_loss_path", type=str, default='Cherry/loss.json')
     parser.add_argument("--save_path", type=str, required=True)
     parser.add_argument("--model_name_or_path", type=str, required=True)
     parser.add_argument("--max_length", type=int, default=512)
@@ -74,7 +75,7 @@ def get_perplexity_and_embedding_whole_text(model, text):
 # Used to get the ppl and emb for part of input, used in conditional version, and token-wise loss
 def get_perplexity_and_embedding_part_text(model, text):
     #给input部分进行label-100掩码
-    labels = torch.where(text['attention_mask'] == 1, text['input_ids'], -100)
+    labels = torch.where(text['attention_mask'] == 1, text['input_ids'], -100).contiguous()
     # start_index = text.rfind(target_span)
     # start_token = len(tokenizer.encode(text[:start_index]))
     # end_token = input_ids.shape[1]
@@ -84,7 +85,6 @@ def get_perplexity_and_embedding_part_text(model, text):
 
     with torch.no_grad():
         outputs = model(text['input_ids'], labels=labels)
-
     loss = outputs.loss
     #print(loss)
 
@@ -116,7 +116,7 @@ def main():
     print(args)
     #sampling_params = SamplingParams(temperature=0.8, top_p=0.95,export_logits=True)
     # 加载配置和模型
-    model = Qwen2ForCausalLM.from_pretrained(args.model_name_or_path, cache_dir='../cache', output_hidden_states=True, attn_implementation="flash_attention_2", torch_dtype=torch.float16).to('cuda')
+    model = Qwen2ForCausalLM.from_pretrained(args.model_name_or_path, cache_dir='../cache', output_hidden_states=True, device_map="auto",attn_implementation="flash_attention_2", torch_dtype=torch.float16).to('cuda')
     tokenizer =AutoTokenizer.from_pretrained(args.model_name_or_path, cache_dir='../cache')
     model.eval()
 
@@ -131,14 +131,14 @@ def main():
                 #i['output']=''.join(i['output'].split('\n')[1:])
                 data.append(i)
 
-    _data=[]
-    for i in data:
-        i['output'] = ''.join(i['output'].split('\n')[1:])
-        _data.append(i)
+    # _data=[]
+    # for i in data:
+    #     i['output'] = ''.join(i['output'].split('\n')[1:])
+    #     _data.append(i)
 
     start_idx = args.start_idx
-    end_idx = args.end_idx if args.end_idx != -1 else len(_data)
-    sampled_data = _data[start_idx:end_idx]
+    end_idx = args.end_idx if args.end_idx != -1 else len(data)
+    sampled_data = data[start_idx:end_idx]
 
     strat_time = time.time()
     input_data = {'input_ids':[]}
@@ -183,8 +183,10 @@ def main():
     dataloader_query = DataLoader(Dataset.from_dict(input_data),collate_fn=data_collator,batch_size=args.batch_size, shuffle=False)
     dataloader_whole = DataLoader(Dataset.from_dict(whole_data),collate_fn=data_collator,batch_size=args.batch_size, shuffle=False)
 
-    #accelerator = Accelerator(num_processes=2,num_machines=2)
-    #accelerator.wait_for_everyone()
+
+    #更新输出路径文件
+    with open(args.save_loss_path, "w") as file:
+        pass  # Creates an empty file
 
     new_data=[]
     print('INFO|start to get ppl and loss')
@@ -214,10 +216,13 @@ def main():
             ppl_out_condition, loss_list_condition = get_perplexity_and_embedding_part_text(model, batch_wh.to('cuda'))
 
             for i in range(ppl_out_alone.shape[0]):
-                new_data.append({'ppl':[ppl_out_alone[i].item(),ppl_out_condition[i].item()],'token_loss':[loss_list_alone[i],loss_list_condition[i]]})
+                temp={'ppl':[ppl_out_alone[i].item(),ppl_out_condition[i].item()],'token_loss':[loss_list_alone[i],loss_list_condition[i]]}
+                new_data.append(temp)
 
-        with open(args.save_loss_path, "w") as file:
-            json.dump(new_data,file)
+                with open(args.save_loss_path, "a") as file:
+                    json.dump(temp,file)
+                    file.write("\n")
+
         print('INFO|save the loss in '+args.save_loss_path)
 
         #计算ifd
