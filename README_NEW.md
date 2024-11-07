@@ -91,9 +91,10 @@ CUDA_VISIBLE_DEVICES=0,1 python superfiltering/run_ifd.py \
   --data_type 数据格式，只支持Sharegpt和Alpaca两种 \
   --ifd_rate  IFD筛选比例（例：筛选IFD值排名前20%数据） 
 - 注意：如果只评估数据的ifd值，不筛选数据可以把ifd_rate设为1，但最后输出的文本会过滤掉IFD大于1的样本。因为如果 IFD 分数大于 1，则基于指令的loss值甚至大于直接生成的loss值，这意味着给定的指令没有为预测响应提供有用的上下文。在这种情况下，我们认为指令和相应的响应之间存在不一致。因此，我们选择过滤这些可能错位的样本。
-- 由于使用gpt2预训练模型生成结果，因此支持的文本最大长度为1024，若过长直接truncated
+- 由于使用gpt2预训练模型生成结果，因此支持的文本最大长度为1024，若过长直接truncated，若需要支持更长的文本，可使用下面的IFD_qwen7B方法筛选数据
 - 若ppl和loss的计算终止，可查看outputs/.cache/debug.jsonl查看已经计算的部分值
 ## 3. IFD_qwen7B
+主要筛选流程为：聚类筛选少量多样数据；拿这部分数据对模型进行初步训练；初学模型计算原始数据的IFD指标，并筛选
 ### 3.1 选择Pre-Experienced数据集
 #### 3.1.1 计算embedding
 ```
